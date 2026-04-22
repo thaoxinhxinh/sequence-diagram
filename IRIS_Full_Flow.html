@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>IRIS — Full Research Flow</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f5f7fa; --surface: #ffffff; --border: #dde3ed;
+      --accent: #3b6fd4; --accent2: #16a872; --text: #1a202c; --muted: #64748b;
+    }
+    html, body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; }
+
+    header {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 18px 40px; display: flex; align-items: center; gap: 16px;
+    }
+    .logo {
+      font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; flex-shrink: 0;
+    }
+    .subtitle { font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; }
+    .hint {
+      margin-left: auto; font-size: 12px; color: var(--muted);
+      font-family: 'DM Mono', monospace; background: var(--bg);
+      border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px; flex-shrink: 0;
+    }
+
+    main { padding: 24px 32px 32px; }
+
+    .section-header { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+    .section-badge {
+      font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 500;
+      padding: 3px 8px; border-radius: 4px; flex-shrink: 0; margin-top: 2px;
+      background: #cffafe; color: #0e7490; border: 1px solid #a5f3fc;
+    }
+    .section-title { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; color: #0e7490; }
+    .section-desc { font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; margin-top: 3px; }
+
+    .diagram-card {
+      background: #f0fdfe; border: 2px solid #a5f3fc; border-radius: 12px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.06); overflow: hidden; cursor: zoom-in;
+      position: relative; transition: box-shadow 0.2s, border-color 0.2s;
+    }
+    .diagram-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.1); border-color: #0e7490; }
+    .zoom-badge {
+      position: absolute; bottom: 10px; right: 12px; font-size: 11px;
+      font-family: 'DM Mono', monospace; color: var(--muted);
+      background: rgba(255,255,255,0.92); border: 1px solid var(--border);
+      border-radius: 20px; padding: 3px 10px; pointer-events: none;
+    }
+    .diagram-inner { padding: 16px 16px 36px; overflow: hidden; display: flex; }
+    .diagram-inner .mermaid { display: inline-block; transform-origin: top left; }
+
+    /* ── Modal ── */
+    #modal {
+      display: none; position: fixed; inset: 0; z-index: 1000;
+      background: rgba(15,20,30,0.82); backdrop-filter: blur(6px);
+      align-items: center; justify-content: center;
+    }
+    #modal.open { display: flex; }
+    #modal-box {
+      background: #fff; border-radius: 14px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.35);
+      width: 94vw; height: 90vh; display: flex; flex-direction: column; overflow: hidden;
+    }
+    #modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    #modal-title { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; color: var(--text); }
+    #modal-controls { display: flex; align-items: center; gap: 8px; }
+    .ctrl-btn {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+      padding: 5px 12px; font-size: 14px; cursor: pointer; color: var(--text);
+      font-family: 'DM Mono', monospace; transition: background 0.15s; user-select: none;
+    }
+    .ctrl-btn:hover { background: #e2e8f0; }
+    #close-btn { background: #fee2e2; border-color: #fca5a5; color: #b91c1c; font-weight: 600; }
+    #close-btn:hover { background: #fca5a5; }
+    #zoom-label { font-size: 12px; font-family: 'DM Mono', monospace; color: var(--muted); min-width: 44px; text-align: center; }
+    #modal-viewport { flex: 1; overflow: auto; cursor: grab; }
+    #modal-viewport:active { cursor: grabbing; }
+    #modal-viewport::-webkit-scrollbar { width: 8px; height: 8px; }
+    #modal-viewport::-webkit-scrollbar-track { background: #f1f5f9; }
+    #modal-viewport::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; }
+    #modal-content { padding: 32px; display: inline-block; min-width: 100%; min-height: 100%; }
+    #modal-content svg { display: block; transform-origin: top left; }
+    #modal-hint {
+      text-align: center; padding: 8px; font-size: 11px;
+      font-family: 'DM Mono', monospace; color: var(--muted);
+      border-top: 1px solid var(--border); flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="logo">IRIS</span>
+  <span class="subtitle">sequence diagram &nbsp;·&nbsp; Full Research Flow — Phase 1 → 9</span>
+  <span class="hint">🔍 click vào diagram để zoom</span>
+</header>
+
+<main>
+  <div class="section-header">
+    <span class="section-badge">SD-FULL</span>
+    <div>
+      <h2 class="section-title">Full Research Flow — Brief Intake đến Export & Notify</h2>
+      <p class="section-desc">User · User Agent · IRIS UI · Execution Agent · QC Agent · Backend &nbsp;·&nbsp; 9 phases end-to-end</p>
+    </div>
+  </div>
+
+  <div class="diagram-card" onclick="openModal(this, 'SD-FULL — Full Research Flow (Phase 1–9)')">
+    <div class="diagram-inner"><div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor User
+    participant UA as User Agent
+    participant IRIS as IRIS UI
+    participant EA as Execution Agent
+    participant QC as QC Agent
+    participant BE as Backend
+
+    Note over User,BE: 🔹 Phase 1 — Login & Brief Intake
+    User->>IRIS: Login + thu thập user info (tên/phòng ban/title)
+    User->>IRIS: Bấm "Tạo dự án mới"
+    IRIS->>User: Popup form brief
+    User->>IRIS: Submit brief
+    IRIS->>EA: Brief Intake — review brief
+    loop Clarify đến khi đủ & rõ ràng
+        EA->>EA: Check đầy đủ / rõ ràng / nhất quán
+        alt Brief chưa đạt
+            EA->>IRIS: Trả list trường chưa đạt
+            IRIS->>User: Popup form bổ sung (chỉ trường thiếu)
+            User->>IRIS: Điền thêm + Submit
+            IRIS->>EA: Resubmit brief
+        else Brief đã đủ
+            EA->>IRIS: Confirm brief đạt yêu cầu
+        end
+    end
+    IRIS->>User: Hiển thị full brief
+    User->>IRIS: Confirm Brief
+    IRIS->>BE: Lock brief
+
+    Note over User,BE: 🔹 Phase 2 — Research Plan Generation
+    IRIS->>EA: Trigger Plan generation
+    EA->>BE: Load Brief + KB + past plans
+    EA->>EA: Generate Research Plan draft (async)
+    loop QC + Human Gate (max 3 retry)
+        EA->>QC: Submit draft Plan
+        QC->>QC: Chấm rubric (methodology/scope/sample/timeline/budget)
+        alt Fail (0-7)
+            QC-->>EA: Feedback + redo
+        else Pass (8-10)
+            QC->>UA: Forward cho CIO Research Team
+            UA-->>IRIS: Approve / feedback
+        end
+    end
+    IRIS->>User: Hiển thị Research Plan
+    User->>IRIS: Confirm Plan
+    IRIS->>BE: Lock Plan + tạo Project
+
+    Note over User,BE: 🔹 Phase 3 — Routing & Kick-off
+    alt Nhánh A (CIO tư vấn)
+        IRIS->>EA: Routing classification (CIO handle / BU self-execute)
+        loop QC + Human Gate (max 3)
+            EA->>QC: Submit classification
+            alt Fail
+                QC-->>EA: Feedback + redo
+            else Pass
+                QC->>UA: Forward cho CIO Manager
+                UA-->>IRIS: Approve + assign PIC/Supporter
+            end
+        end
+        IRIS->>User: Thông báo phân loại
+        User->>IRIS: Bấm "Xác nhận và gửi"
+        IRIS->>BE: Email BU Head approve
+        BE-->>IRIS: Head approve
+    else Nhánh B (BU tự thực hiện)
+        IRIS->>User: Thông báo cần Manager approve
+        User->>IRIS: Bấm "Xác nhận và gửi"
+        IRIS->>BE: Email BU Manager approve
+        BE-->>IRIS: Manager approve
+    end
+    IRIS->>BE: Kick-off dự án
+    BE->>User: Notify BU dự án đã kick-off
+
+    Note over User,BE: 🔹 Phase 4 — Design QSN (Quanti) hoặc DG (Quali)
+    User->>IRIS: Bấm "Tạo Questionnaire" / "Tạo Discussion Guide"
+    IRIS->>EA: Trigger QSN/DG generation
+    EA->>BE: Load Brief + Plan
+    EA->>EA: Generate QSN/DG draft (async)
+    loop QC + Human Gate (max 3)
+        EA->>QC: Submit draft
+        alt Fail
+            QC-->>EA: Feedback + redo
+        else Pass
+            QC->>UA: Forward cho CIO Researcher
+            UA-->>IRIS: Approve
+        end
+    end
+    IRIS->>User: Hiển thị QSN/DG
+    User->>IRIS: Finalize
+    IRIS->>BE: Lock QSN/DG
+
+    Note over User,BE: 🔹 Phase 5 — Fieldwork Quanti (Execution Agent chạy end-to-end)
+    User->>IRIS: Bấm "Scripting"
+    IRIS->>EA: Trigger auto-scripting
+    EA->>BE: Script QSN → Survey
+    EA-->>User: Hiển thị survey đã script
+    User->>IRIS: Bấm "Test link"
+    IRIS->>EA: Trigger auto-test
+    EA->>BE: Run test (logic/skip/reward)
+    EA-->>User: Báo cáo test + link
+    User->>IRIS: Confirm link OK + Setup segment & channels
+    IRIS->>EA: Trigger Distribution
+    EA->>BE: Distribute multi-channel (Noti / Journey / Widget)
+    BE-->>EA: Realtime response data
+    loop Monitor FW (realtime, agent-driven)
+        EA->>BE: Track completion / quota / dropout
+        EA->>IRIS: Dashboard realtime
+        alt Lệch chỉ tiêu
+            IRIS-->>User: Alert
+            User->>IRIS: Điều chỉnh segment/channel/incentive
+        end
+    end
+    User->>IRIS: Bấm "End Fieldwork"
+    IRIS->>EA: Trigger Clean Data
+    EA->>BE: Apply clean rules (speeding/straightlining/logic/OE spam/duplicate/incomplete)
+    EA-->>User: Báo cáo clean data (# valid / # invalid)
+    User->>IRIS: Confirm End FW
+    IRIS->>BE: Lock clean dataset
+    IRIS->>EA: Trigger Auto Reward
+    EA->>BE: Trả thưởng qua MoMo App (chỉ respondent pass clean rules)
+
+    Note over User,BE: 🔹 Phase 5' — Ops Monitoring Quali (song song với Phase 5)
+    User->>IRIS: Recruit đáp viên + setup lịch PV
+    IRIS->>BE: Lưu panelist list + schedule
+    loop Mỗi session PV
+        User->>IRIS: Conduct IDI/FGD + upload recording
+        IRIS->>BE: Save recording + metadata
+    end
+    loop Monitor FW Quali
+        IRIS->>User: Dashboard progress + alert nếu lệch
+    end
+    User->>IRIS: End FW Quali
+    IRIS->>BE: Lock panelist + recordings
+
+    Note over User,BE: 🔹 Phase 6 — Data Processing & Transcript Analysis
+    alt Quanti
+        IRIS->>EA: Trigger Data Processing
+        EA->>BE: Load clean dataset
+        EA->>EA: Weighting / stats / crosstab / OE categorize
+    else Quali
+        User->>IRIS: Upload transcript
+        IRIS->>EA: Trigger Transcript Analysis
+        EA->>BE: Load transcript + DG
+        EA->>EA: Phân tích + tổng hợp key findings
+    end
+    loop QC + Human Gate (max 3) — chỉ cho Quanti Data Processing
+        EA->>QC: Submit processing output
+        alt Fail
+            QC-->>EA: Feedback + redo
+        else Pass
+            QC->>UA: Forward cho CIO Researcher
+            UA-->>IRIS: Approve
+        end
+    end
+    IRIS->>BE: Lock processed data / transcript analysis
+
+    Note over User,BE: 🔹 Phase 7 — Branch Reports (Dashboard Quanti / Report Quali)
+    IRIS->>EA: Trigger Report generation
+    EA->>BE: Load processed data / transcript
+    EA->>EA: Generate Dashboard charts + key findings / Report Quali (text/infographic)
+    loop QC + Human Gate (max 3)
+        EA->>QC: Submit draft Report
+        alt Fail
+            QC-->>EA: Feedback + redo
+        else Pass
+            QC->>UA: Forward cho CIO Researcher
+            UA-->>IRIS: Approve
+        end
+    end
+    IRIS->>User: Hiển thị Branch Report
+    User->>IRIS: Review + bổ sung business context
+
+    Note over User,BE: 🔹 Phase 8 — Final Report Synthesis
+    User->>IRIS: Bấm "Tạo Final Report"
+    IRIS->>EA: Trigger Final Report
+    EA->>BE: Load all Branch Reports + Brief/Plan + KB
+    EA->>EA: Generate comprehensive report (cross-methodology synthesis + insight + implication)
+    loop QC + Human Gate (max 3)
+        EA->>QC: Submit draft Final Report
+        alt Fail
+            QC-->>EA: Feedback + redo
+        else Pass
+            QC->>UA: Forward cho CIO Manager (senior)
+            UA-->>IRIS: Approve
+        end
+    end
+    IRIS->>User: Hiển thị Final Report
+    User->>IRIS: Review + bổ sung context & recommendation
+
+    Note over User,BE: 🔹 Phase 9 — Export & Notify Stakeholder
+    User->>IRIS: Bấm "Export" (PDF / slide / link)
+    IRIS->>EA: Call Export skill
+    EA->>BE: Generate file export
+    EA-->>User: Trả file
+    User->>IRIS: Bấm "Notify stakeholder" + chọn danh sách
+    IRIS->>BE: Email "Report ready" + link cho stakeholder
+    BE-->>User: Xác nhận đã gửi notification
+    </div></div>
+    <span class="zoom-badge">🔍 click để zoom</span>
+  </div>
+</main>
+
+<!-- Modal -->
+<div id="modal">
+  <div id="modal-box">
+    <div id="modal-header">
+      <span id="modal-title"></span>
+      <div id="modal-controls">
+        <button class="ctrl-btn" onclick="zoomOut()">－</button>
+        <span id="zoom-label">100%</span>
+        <button class="ctrl-btn" onclick="zoomIn()">＋</button>
+        <button class="ctrl-btn" onclick="resetZoom()">⟳ Reset</button>
+        <button class="ctrl-btn" id="close-btn" onclick="closeModal()">✕ Đóng</button>
+      </div>
+    </div>
+    <div id="modal-viewport">
+      <div id="modal-content"></div>
+    </div>
+    <div id="modal-hint">scroll / kéo để di chuyển &nbsp;·&nbsp; nút + − để zoom &nbsp;·&nbsp; Ctrl+scroll &nbsp;·&nbsp; ESC để đóng</div>
+  </div>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'default',
+    themeVariables: {
+      background: '#ffffff', primaryColor: '#eff6ff', primaryTextColor: '#1e3a5f',
+      primaryBorderColor: '#bfdbfe', lineColor: '#94a3b8', secondaryColor: '#f0fdf4',
+      tertiaryColor: '#fff7ed', noteBkgColor: '#fefce8', noteTextColor: '#713f12',
+      noteBorderColor: '#fde68a', activationBkgColor: '#dbeafe', activationBorderColor: '#3b82f6',
+      sequenceNumberColor: '#ffffff', actorBkg: '#f8fafc', actorTextColor: '#1e293b',
+      actorLineColor: '#cbd5e1', actorBorder: '#94a3b8', labelBoxBkgColor: '#f1f5f9',
+      labelBoxBorderColor: '#cbd5e1', labelTextColor: '#475569', loopTextColor: '#475569',
+      signalColor: '#64748b', signalTextColor: '#1e293b',
+      fontFamily: 'DM Sans, sans-serif', fontSize: '13px'
+    },
+    sequence: {
+      diagramMarginX: 20, diagramMarginY: 20, actorMargin: 50,
+      width: 140, height: 44, boxMargin: 10, boxTextMargin: 5,
+      noteMargin: 10, messageMargin: 35, mirrorActors: true, useMaxWidth: false
+    }
+  });
+
+  /* Scale thumbnail to fit */
+  document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+      document.querySelectorAll('.diagram-card').forEach(card => {
+        const inner = card.querySelector('.diagram-inner');
+        const mermaidEl = inner.querySelector('.mermaid');
+        const svg = mermaidEl && mermaidEl.querySelector('svg');
+        if (!svg) return;
+        const svgW = svg.getBoundingClientRect().width;
+        const svgH = svg.getBoundingClientRect().height;
+        const scale = Math.min(1, (inner.clientWidth - 32) / svgW);
+        mermaidEl.style.transform = `scale(${scale})`;
+        mermaidEl.style.transformOrigin = 'top left';
+        inner.style.height = (svgH * scale + 28) + 'px';
+      });
+    }, 1400);
+  });
+
+  /* Modal logic */
+  let modalScale = 1;
+  const STEP = 0.15;
+
+  function openModal(card, title) {
+    const svg = card.querySelector('svg');
+    if (!svg) return;
+    const clone = svg.cloneNode(true);
+    clone.removeAttribute('style');
+    document.getElementById('modal-content').innerHTML = '';
+    document.getElementById('modal-content').appendChild(clone);
+    document.getElementById('modal-title').textContent = title;
+    modalScale = 1; applyScale();
+    document.getElementById('modal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+    setupDrag();
+  }
+
+  function closeModal() {
+    document.getElementById('modal').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  function applyScale() {
+    const svg = document.querySelector('#modal-content svg');
+    if (!svg) return;
+    svg.style.transform = `scale(${modalScale})`;
+    svg.style.transformOrigin = 'top left';
+    document.getElementById('zoom-label').textContent = Math.round(modalScale * 100) + '%';
+    document.getElementById('modal-content').style.width  = (svg.scrollWidth  * modalScale + 64) + 'px';
+    document.getElementById('modal-content').style.height = (svg.scrollHeight * modalScale + 64) + 'px';
+  }
+
+  function zoomIn()    { modalScale = Math.min(4, modalScale + STEP); applyScale(); }
+  function zoomOut()   { modalScale = Math.max(0.15, modalScale - STEP); applyScale(); }
+  function resetZoom() { modalScale = 1; applyScale(); }
+
+  document.getElementById('modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('modal')) closeModal();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeModal();
+    if (e.key === '+' || e.key === '=') zoomIn();
+    if (e.key === '-') zoomOut();
+  });
+
+  function setupDrag() {
+    const vp = document.getElementById('modal-viewport');
+    let down = false, sx = 0, sy = 0, sl = 0, st = 0;
+    vp.onmousedown = e => { down=true; sx=e.pageX; sy=e.pageY; sl=vp.scrollLeft; st=vp.scrollTop; vp.style.cursor='grabbing'; };
+    vp.onmousemove = e => { if(!down) return; vp.scrollLeft=sl-(e.pageX-sx); vp.scrollTop=st-(e.pageY-sy); };
+    vp.onmouseup = vp.onmouseleave = () => { down=false; vp.style.cursor='grab'; };
+  }
+
+  document.getElementById('modal-viewport').addEventListener('wheel', e => {
+    if (e.ctrlKey || e.metaKey) { e.preventDefault(); e.deltaY < 0 ? zoomIn() : zoomOut(); }
+  }, { passive: false });
+</script>
+</body>
+</html>
